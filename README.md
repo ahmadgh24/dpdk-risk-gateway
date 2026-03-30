@@ -9,6 +9,7 @@ DPDK-based pre-trade risk gateway. Sits on the wire, inspects UDP order packets 
 - Parses a custom `TradingOrder` protocol from the UDP payload
 - Applies risk checks (currently: max quantity per order)
 - Forwards passing orders, drops the rest
+- Live telemetry — a dedicated stats lcore prints pass/drop counters every second without touching the hot path
 
 ## building
 
@@ -25,8 +26,10 @@ ninja -C builddir
 With a real NIC bound to DPDK:
 
 ```
-sudo ./builddir/riskgw
+sudo ./builddir/riskgw -l 0,1
 ```
+
+Needs at least 2 lcores: core 0 runs the packet loop, core 1 runs the stats thread.
 
 For development/testing without a physical NIC, use a veth pair with `af_packet`:
 
@@ -37,7 +40,7 @@ sudo ip link set veth1 up
 
 sudo LD_LIBRARY_PATH=/usr/local/lib64:$LD_LIBRARY_PATH \
   ./builddir/riskgw \
-  --no-huge --no-pci -l 0 \
+  --no-huge --no-pci -l 0,1 \
   --vdev 'net_af_packet0,iface=veth0'
 ```
 
@@ -70,4 +73,4 @@ struct TradingOrder {
 
 ## status
 
-Early stage. The risk engine only checks quantity limits right now. Next up: per-symbol position tracking, magic field validation, stats/telemetry, graceful shutdown.
+Early stage. The risk engine only checks quantity limits right now. Next up: per-symbol position tracking, magic field validation, graceful shutdown.

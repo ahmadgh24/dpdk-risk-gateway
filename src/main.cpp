@@ -4,6 +4,9 @@
 #include <rte_ether.h>
 #include <rte_ip.h>
 #include <rte_udp.h>
+#include <rte_launch.h>
+#include <rte_lcore.h>
+#include <rte_cycles.h>
 #include <cstdio>
 #include "RiskEngine.hpp"
 #include "Protocol.hpp"
@@ -96,6 +99,16 @@ static __rte_noreturn void lcore_main(uint16_t port, RiskEngine &engine) {
     }
 }
 
+static int stats_loop(void *arg) {
+    auto *engine = static_cast<const RiskEngine *>(arg);
+    for (;;) {
+        rte_delay_ms(1000);
+        auto s = engine->get_stats();
+        printf("[stats] passed: %lu  dropped: %lu\n", s.total_passed, s.total_dropped);
+    }
+    return 0;
+}
+
 int main(int argc, char *argv[]) {
     int ret = rte_eal_init(argc, argv);
     if (ret < 0) {
@@ -130,6 +143,13 @@ int main(int argc, char *argv[]) {
 
     uint16_t first_port = 0;
     RTE_ETH_FOREACH_DEV(first_port) { break; }
+
+    unsigned stats_lcore = rte_get_next_lcore(rte_lcore_id(), 1, 0);
+    if (stats_lcore == RTE_MAX_LCORE) {
+        fprintf(stderr, "Need at least 2 lcores (-l 0,1)\n");
+        return -1;
+    }
+    rte_eal_remote_launch(stats_loop, &engine, stats_lcore);
 
     lcore_main(first_port, engine);
 }

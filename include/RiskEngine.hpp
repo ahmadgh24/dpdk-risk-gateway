@@ -3,6 +3,7 @@
 
 #include <rte_common.h>
 #include <cstdint>
+#include <atomic>
 
 class alignas(64) RiskEngine {
 public:
@@ -19,8 +20,8 @@ public:
 
 private:
     uint32_t m_max_qty;
-    uint64_t m_passed;
-    uint64_t m_dropped;
+    std::atomic<uint64_t> m_passed;
+    std::atomic<uint64_t> m_dropped;
 };
 
 #endif
