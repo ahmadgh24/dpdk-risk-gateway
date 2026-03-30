@@ -71,7 +71,6 @@ static __rte_noreturn void lcore_main(uint16_t port, RiskEngine &engine) {
 
     for (;;) {
         struct rte_mbuf *bufs[BURST_SIZE];
-        struct rte_mbuf *tx_bufs[BURST_SIZE];
         uint16_t nb_tx = 0;
 
         const uint16_t nb_rx = rte_eth_rx_burst(port, 0, bufs, BURST_SIZE);
@@ -88,14 +87,14 @@ static __rte_noreturn void lcore_main(uint16_t port, RiskEngine &engine) {
             const uint8_t *payload = rte_pktmbuf_mtod_offset(bufs[i], const uint8_t *, hdr_offset);
 
             if (engine.check_order(payload))
-                tx_bufs[nb_tx++] = bufs[i];
+                bufs[nb_tx++] = bufs[i];
             else
                 rte_pktmbuf_free(bufs[i]);
         }
 
-        const uint16_t nb_sent = rte_eth_tx_burst(port, 0, tx_bufs, nb_tx);
+        const uint16_t nb_sent = rte_eth_tx_burst(port, 0, bufs, nb_tx);
         for (uint16_t i = nb_sent; i < nb_tx; i++)
-            rte_pktmbuf_free(tx_bufs[i]);
+            rte_pktmbuf_free(bufs[i]);
     }
 }
 
