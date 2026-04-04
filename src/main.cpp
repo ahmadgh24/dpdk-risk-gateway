@@ -10,6 +10,7 @@
 #include <cstdio>
 #include "RiskEngine.hpp"
 #include "Protocol.hpp"
+#include "LatencyTracker.hpp"
 
 #define RX_RING_SIZE 1024
 #define TX_RING_SIZE 1024
@@ -66,7 +67,7 @@ static bool is_valid_order_packet(struct rte_mbuf *m) {
     return true;
 }
 
-static __rte_noreturn void lcore_main(uint16_t port, RiskEngine &engine) {
+static __rte_noreturn void lcore_main(uint16_t port, RiskEngine &engine, LatencyTracker &tracker) {
     printf("Core %u processing port %u\n", rte_lcore_id(), port);
 
     for (;;) {
@@ -86,7 +87,11 @@ static __rte_noreturn void lcore_main(uint16_t port, RiskEngine &engine) {
             const size_t hdr_offset = sizeof(rte_ether_hdr) + sizeof(rte_ipv4_hdr) + sizeof(rte_udp_hdr);
             const uint8_t *payload = rte_pktmbuf_mtod_offset(bufs[i], const uint8_t *, hdr_offset);
 
-            if (engine.check_order(payload))
+            uint64_t t0 = rte_rdtsc();
+            bool pass = engine.check_order(payload);
+            tracker.record(rte_rdtsc() - t0);
+
+            if (pass)
                 bufs[nb_tx++] = bufs[i];
             else
                 rte_pktmbuf_free(bufs[i]);
@@ -98,12 +103,18 @@ static __rte_noreturn void lcore_main(uint16_t port, RiskEngine &engine) {
     }
 }
 
+struct StatsArgs {
+    const RiskEngine *engine;
+    const LatencyTracker *tracker;
+};
+
 static int stats_loop(void *arg) {
-    auto *engine = static_cast<const RiskEngine *>(arg);
+    auto *a = static_cast<StatsArgs *>(arg);
     for (;;) {
         rte_delay_ms(1000);
-        auto s = engine->get_stats();
+        auto s = a->engine->get_stats();
         printf("[stats] passed: %lu  dropped: %lu\n", s.total_passed, s.total_dropped);
+        a->tracker->print_stats();
     }
     return 0;
 }
@@ -139,6 +150,7 @@ int main(int argc, char *argv[]) {
     }
 
     RiskEngine engine(1000);
+    LatencyTracker tracker;
 
     uint16_t first_port = 0;
     RTE_ETH_FOREACH_DEV(first_port) { break; }
@@ -148,7 +160,8 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Need at least 2 lcores (-l 0,1)\n");
         return -1;
     }
-    rte_eal_remote_launch(stats_loop, &engine, stats_lcore);
+    StatsArgs stats_args = {&engine, &tracker};
+    rte_eal_remote_launch(stats_loop, &stats_args, stats_lcore);
 
-    lcore_main(first_port, engine);
+    lcore_main(first_port, engine, tracker);
 }

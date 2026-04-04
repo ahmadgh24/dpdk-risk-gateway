@@ -77,27 +77,17 @@ int main() {
     PcapFileHeader hdr;
     fwrite(&hdr, sizeof(hdr), 1, f);
 
-    // Order 1: qty=500 (should PASS with limit=1000)
-    write_packet(f, 1, {0xBEEF, 1, 100, 500, 99.50});
+    const uint32_t NUM_ORDERS = 10000;
+    uint16_t symbols[] = {100, 200, 300, 400};
 
-    // Order 2: qty=1000 (should PASS, exactly at limit)
-    write_packet(f, 2, {0xBEEF, 2, 200, 1000, 150.25});
-
-    // Order 3: qty=1001 (should be DROPPED)
-    write_packet(f, 3, {0xBEEF, 3, 300, 1001, 200.00});
-
-    // Order 4: qty=5000 (should be DROPPED)
-    write_packet(f, 4, {0xBEEF, 4, 100, 5000, 50.00});
-
-    // Order 5: qty=1 (should PASS)
-    write_packet(f, 5, {0xBEEF, 5, 400, 1, 10.00});
+    for (uint32_t i = 0; i < NUM_ORDERS; i++) {
+        uint32_t qty = (i % 3 == 0) ? 1500 : 500;  // ~1/3 dropped
+        uint16_t sym = symbols[i % 4];
+        double price = 50.0 + (i % 100);
+        write_packet(f, i, {0xBEEF, i + 1, sym, qty, price});
+    }
 
     fclose(f);
-    printf("Generated test_orders.pcap with 5 packets\n");
-    printf("  Order 1: qty=500   -> PASS\n");
-    printf("  Order 2: qty=1000  -> PASS\n");
-    printf("  Order 3: qty=1001  -> DROP\n");
-    printf("  Order 4: qty=5000  -> DROP\n");
-    printf("  Order 5: qty=1     -> PASS\n");
+    printf("Generated test_orders.pcap with %u packets\n", NUM_ORDERS);
     return 0;
 }
