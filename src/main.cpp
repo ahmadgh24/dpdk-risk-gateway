@@ -113,7 +113,7 @@ static int stats_loop(void *arg) {
     for (;;) {
         rte_delay_ms(1000);
         auto s = a->engine->get_stats();
-        printf("[stats] passed: %lu  dropped: %lu\n", s.total_passed, s.total_dropped);
+        printf("[stats] passed: %lu  dropped: %lu  malformed: %lu\n", s.total_passed, s.total_dropped, s.total_malformed);
         a->tracker->print_stats();
     }
     return 0;

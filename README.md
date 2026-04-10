@@ -7,7 +7,9 @@ DPDK-based pre-trade risk gateway. Sits on the wire, inspects UDP order packets 
 - Receives raw packets via DPDK (zero-copy, kernel bypass)
 - Validates Ethernet/IPv4/UDP headers
 - Parses a custom `TradingOrder` protocol from the UDP payload
-- Applies risk checks (currently: max quantity per order)
+- Validates magic field on incoming orders
+- Rejects orders exceeding per-order quantity limits
+- Tracks cumulative position per symbol via `rte_hash`, rejects when a symbol exceeds its limit
 - Forwards passing orders, drops the rest
 - Live telemetry — a dedicated stats lcore prints pass/drop counters every second without touching the hot path
 
@@ -73,4 +75,4 @@ struct TradingOrder {
 
 ## status
 
-Early stage. The risk engine only checks quantity limits right now. Next up: per-symbol position tracking, magic field validation, graceful shutdown.
+Early stage. Next up: notional value checks, rate limiting, graceful shutdown, config file.
